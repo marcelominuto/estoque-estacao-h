@@ -1,0 +1,1 @@
+ALTER TABLE "motorcycles" ADD COLUMN "notes" text;
