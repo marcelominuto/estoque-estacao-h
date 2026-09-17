@@ -52,13 +52,18 @@ async function requestFipe<T>(
   const timeout = setTimeout(() => controller.abort(), 5_000);
 
   try {
-    const response = await fetch(createFipeUrl(path, params), {
+    const url = createFipeUrl(path, params);
+    const response = await fetch(url, {
       headers: { Accept: 'application/json' },
       signal: controller.signal,
       cache: 'no-store',
     });
 
     if (!response.ok) {
+      console.error('[FIPEX] upstream request failed', {
+        path: url.pathname,
+        status: response.status,
+      });
       throw new FipeApiError('FIPEX_REQUEST_FAILED', response.status);
     }
 
@@ -71,6 +76,10 @@ async function requestFipe<T>(
     return parsed.data;
   } catch (error) {
     if (error instanceof FipeApiError) throw error;
+    console.error('[FIPEX] upstream request unavailable', {
+      path,
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw new FipeApiError('FIPEX_UNAVAILABLE', 503);
   } finally {
     clearTimeout(timeout);

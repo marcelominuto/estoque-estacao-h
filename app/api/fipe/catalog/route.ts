@@ -16,6 +16,10 @@ const kindSchema = z.enum(['makes', 'models', 'years', 'price']);
 
 function fipeErrorResponse(error: unknown) {
   const status = error instanceof FipeApiError ? error.status : 503;
+  console.error('[API /api/fipe/catalog] FIPEX error', {
+    status,
+    error: error instanceof Error ? error.message : String(error),
+  });
   return NextResponse.json(
     { message: 'Não foi possível consultar a FIPE.' },
     { status: status === 429 ? 429 : status >= 500 ? 502 : 503 },
