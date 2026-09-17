@@ -225,6 +225,9 @@ export function InventoryTable({ motorcycles }: { motorcycles: InventoryMotorcyc
                           <RefreshFipeButton
                             id={motorcycle.id}
                             vehicleLabel={vehicleLabel}
+                            fipeModelId={motorcycle.fipeModelId}
+                            fipeFuelId={motorcycle.fipeFuelId}
+                            modelYear={motorcycle.modelYear}
                             disabled={!motorcycle.fipeModelId || !motorcycle.fipeFuelId}
                           />
                           <MotorcycleDetailsDrawer id={motorcycle.id} vehicleLabel={vehicleLabel} />

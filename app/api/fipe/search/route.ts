@@ -33,7 +33,7 @@ export async function GET(request: Request) {
     });
     return NextResponse.json(
       { message: 'Não foi possível consultar a FIPE.' },
-      { status: status === 429 ? 429 : status >= 500 ? 502 : 503 },
+      { status: status >= 400 && status < 500 ? status : status >= 500 ? 502 : 503 },
     );
   }
 }

@@ -6,9 +6,10 @@ import { Loader2, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
-  refreshAllFipeAction,
+  saveFipeSnapshotAction,
   type MotorcycleActionState,
 } from '@/app/(dashboard)/motos/actions';
+import { getFipePrice } from '@/lib/fipe/browser';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -20,25 +21,75 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
+type FipeRefreshTarget = {
+  id: string;
+  fipeModelId: string;
+  fipeFuelId: string;
+  modelYear: number;
+};
+
 type FormSubmitEvent = Parameters<NonNullable<ComponentProps<'form'>['onSubmit']>>[0];
 
-export function RefreshAllFipeButton() {
+function appendFipeSnapshot(formData: FormData, id: string, fipe: Awaited<ReturnType<typeof getFipePrice>>) {
+  formData.set('id', id);
+  formData.set('fipeCode', fipe.fipeCode);
+  formData.set('fipePriceId', fipe.priceId);
+  formData.set('fipeModelId', fipe.modelId);
+  formData.set('fipeMakeId', fipe.makeId);
+  formData.set('fipeFuelId', fipe.fuelId);
+  formData.set('fipeTypeId', fipe.typeId);
+  formData.set('fipeMakeName', fipe.makeName);
+  formData.set('fipeModelName', fipe.modelName);
+  formData.set('fipeFuelName', fipe.fuelName);
+  formData.set('fipePriceCents', fipe.priceCents === null ? '' : String(fipe.priceCents));
+  formData.set('fipeReferenceMonth', String(fipe.referenceMonth));
+  formData.set('fipeReferenceYear', String(fipe.referenceYear));
+}
+
+export function RefreshAllFipeButton({ targets }: { targets: FipeRefreshTarget[] }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function handleSubmit(event: FormSubmitEvent) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
 
     startTransition(async () => {
-      const state: MotorcycleActionState = await refreshAllFipeAction({}, formData);
-      if (state.success) {
-        toast.success(state.success);
+      if (targets.length === 0) {
+        toast.error('Nenhuma moto com referência FIPE para atualizar.');
+        return;
+      }
+
+      let updated = 0;
+      let failed = 0;
+      for (const target of targets) {
+        try {
+          const fipe = await getFipePrice({
+            modelId: target.fipeModelId,
+            fuelId: target.fipeFuelId,
+            year: target.modelYear,
+          });
+          const formData = new FormData();
+          appendFipeSnapshot(formData, target.id, fipe);
+          const state: MotorcycleActionState = await saveFipeSnapshotAction({}, formData);
+          if (state.success) updated += 1;
+          else failed += 1;
+        } catch {
+          failed += 1;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      }
+
+      if (updated > 0) {
+        toast.success(failed > 0
+          ? `${updated} preços FIPE atualizados. ${failed} não puderam ser consultados.`
+          : `${updated} preços FIPE atualizados com sucesso.`);
         setOpen(false);
         router.refresh();
+      } else {
+        toast.error('Não foi possível atualizar os preços FIPE.');
       }
-      if (state.error) toast.error(state.error);
     });
   }
 

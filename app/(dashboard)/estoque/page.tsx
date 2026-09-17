@@ -21,7 +21,18 @@ export default async function StockPage() {
           <p className="mt-1 text-sm font-medium text-slate-500">Consulte e atualize os veículos cadastrados na loja.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <RefreshAllFipeButton />
+          <RefreshAllFipeButton
+            targets={motorcycles.flatMap((motorcycle) => (
+              motorcycle.fipeModelId && motorcycle.fipeFuelId
+                ? [{
+                  id: motorcycle.id,
+                  fipeModelId: motorcycle.fipeModelId,
+                  fipeFuelId: motorcycle.fipeFuelId,
+                  modelYear: motorcycle.modelYear,
+                }]
+                : []
+            ))}
+          />
           <Button
             nativeButton={false}
             render={<Link href="/motos/nova" />}

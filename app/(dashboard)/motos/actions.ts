@@ -14,6 +14,7 @@ import {
   listMotorcycles,
 } from '@/lib/motorcycles';
 import { getFipePrice } from '@/lib/fipe';
+import type { FipeVehicleOption } from '@/lib/fipe/types';
 import {
   formDataToObject,
   motorcycleInputSchema,
@@ -67,6 +68,43 @@ function toDbValues(data: z.infer<typeof motorcycleInputSchema>) {
   };
 }
 
+const fipeSnapshotSchema = z.object({
+  id: z.uuid(),
+  fipeCode: z.string().trim().min(1).max(50),
+  fipePriceId: z.string().trim().min(1).max(255),
+  fipeModelId: z.string().trim().min(1).max(255),
+  fipeMakeId: z.string().trim().min(1).max(255),
+  fipeFuelId: z.string().trim().min(1).max(255),
+  fipeTypeId: z.string().trim().min(1).max(255),
+  fipeMakeName: z.string().trim().min(1).max(255),
+  fipeModelName: z.string().trim().min(1).max(255),
+  fipeFuelName: z.string().trim().min(1).max(255),
+  fipePriceCents: z.preprocess(
+    (value) => value === '' || value === undefined || value === null ? null : Number(value),
+    z.number().int().nonnegative().nullable(),
+  ),
+  fipeReferenceMonth: z.coerce.number().int().min(1).max(12),
+  fipeReferenceYear: z.coerce.number().int().min(1981).max(new Date().getFullYear() + 1),
+});
+
+function toFipeDbValues(fipe: FipeVehicleOption) {
+  return {
+    fipeCode: fipe.fipeCode,
+    fipePriceId: fipe.priceId,
+    fipeModelId: fipe.modelId,
+    fipeMakeId: fipe.makeId,
+    fipeFuelId: fipe.fuelId,
+    fipeTypeId: fipe.typeId,
+    fipeMakeName: fipe.makeName,
+    fipeModelName: fipe.modelName,
+    fipeFuelName: fipe.fuelName,
+    fipePriceCents: fipe.priceCents,
+    fipeReferenceMonth: fipe.referenceMonth,
+    fipeReferenceYear: fipe.referenceYear,
+    fipeUpdatedAt: new Date(),
+  };
+}
+
 async function refreshMotorcycleFipe({
   id,
   fipeModelId,
@@ -88,21 +126,7 @@ async function refreshMotorcycleFipe({
     year: modelYear,
   });
 
-  await editMotorcycle(id, {
-    fipeCode: fipe.fipeCode,
-    fipePriceId: fipe.priceId,
-    fipeModelId: fipe.modelId,
-    fipeMakeId: fipe.makeId,
-    fipeFuelId: fipe.fuelId,
-    fipeTypeId: fipe.typeId,
-    fipeMakeName: fipe.makeName,
-    fipeModelName: fipe.modelName,
-    fipeFuelName: fipe.fuelName,
-    fipePriceCents: fipe.priceCents,
-    fipeReferenceMonth: fipe.referenceMonth,
-    fipeReferenceYear: fipe.referenceYear,
-    fipeUpdatedAt: new Date(),
-  });
+  await editMotorcycle(id, toFipeDbValues(fipe));
 
   return fipe;
 }
@@ -234,6 +258,40 @@ export async function refreshFipeAction(
   } catch (error) {
     console.error('refresh_fipe_failed', error);
     return { error: 'Não foi possível atualizar o preço FIPE. Tente novamente.' };
+  }
+}
+
+export async function saveFipeSnapshotAction(
+  _previousState: MotorcycleActionState = emptyState,
+  formData: FormData,
+): Promise<MotorcycleActionState> {
+  await requireAdmin();
+  const parsed = fipeSnapshotSchema.safeParse(formDataToObject(formData));
+  if (!parsed.success) return { error: 'Referência FIPE inválida.' };
+
+  try {
+    await editMotorcycle(parsed.data.id, {
+      fipeCode: parsed.data.fipeCode,
+      fipePriceId: parsed.data.fipePriceId,
+      fipeModelId: parsed.data.fipeModelId,
+      fipeMakeId: parsed.data.fipeMakeId,
+      fipeFuelId: parsed.data.fipeFuelId,
+      fipeTypeId: parsed.data.fipeTypeId,
+      fipeMakeName: parsed.data.fipeMakeName,
+      fipeModelName: parsed.data.fipeModelName,
+      fipeFuelName: parsed.data.fipeFuelName,
+      fipePriceCents: parsed.data.fipePriceCents,
+      fipeReferenceMonth: parsed.data.fipeReferenceMonth,
+      fipeReferenceYear: parsed.data.fipeReferenceYear,
+      fipeUpdatedAt: new Date(),
+    });
+    revalidatePath('/estoque');
+    revalidatePath(`/motos/${parsed.data.id}`);
+    revalidatePath(`/motos/${parsed.data.id}/editar`);
+    return { success: TOAST_MESSAGES.fipeUpdated };
+  } catch (error) {
+    console.error('save_fipe_snapshot_failed', error);
+    return { error: 'Não foi possível salvar o preço FIPE. Tente novamente.' };
   }
 }
 

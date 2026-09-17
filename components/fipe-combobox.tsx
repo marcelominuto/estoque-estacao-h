@@ -12,7 +12,8 @@ import {
   ComboboxItem,
   ComboboxList,
 } from '@/components/ui/combobox';
-import type { FipeVehicleOption } from '@/lib/fipe';
+import { searchFipeMotorcycles } from '@/lib/fipe/browser';
+import type { FipeVehicleOption } from '@/lib/fipe/types';
 
 type FipeComboboxProps = {
   initial?: FipeVehicleOption | null;
@@ -43,15 +44,7 @@ export function FipeCombobox({ initial = null, onSelect }: FipeComboboxProps) {
     const timer = window.setTimeout(async () => {
       setLoading(true);
       try {
-        const response = await fetch(
-          `/api/fipe/search?q=${encodeURIComponent(normalizedQuery)}`,
-          { signal: controller.signal },
-        );
-        if (!response.ok) throw new Error('FIPEX_REQUEST_FAILED');
-        const payload = (await response.json()) as {
-          data?: FipeVehicleOption[];
-        };
-        setOptions(payload.data ?? []);
+        setOptions(await searchFipeMotorcycles(normalizedQuery, controller.signal));
         setOpen(true);
       } catch (error) {
         if (error instanceof DOMException && error.name === 'AbortError') return;

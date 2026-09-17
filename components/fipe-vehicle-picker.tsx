@@ -6,26 +6,23 @@ import { toast } from 'sonner';
 
 import { AppCombobox } from '@/components/ui/app-combobox';
 import { AppSelect } from '@/components/ui/app-select';
+import {
+  getFipePrice,
+  listFipeMakes,
+  listFipeModels,
+  listFipeYearOptions,
+} from '@/lib/fipe/browser';
 import type {
   FipeMakeOption,
   FipeModelOption,
   FipeVehicleOption,
   FipeYearOption,
-} from '@/lib/fipe';
+} from '@/lib/fipe/types';
 
 type FipeVehiclePickerProps = {
   initial?: FipeVehicleOption | null;
   onSelect: (value: FipeVehicleOption | null) => void;
 };
-
-async function requestCatalog<T>(url: string, signal: AbortSignal) {
-  const response = await fetch(url, { signal });
-  const payload = (await response.json()) as { data?: T; message?: string };
-  if (!response.ok || payload.data === undefined) {
-    throw new Error(payload.message ?? 'Não foi possível consultar a FIPE.');
-  }
-  return payload.data;
-}
 
 function yearKey(option: FipeYearOption) {
   return `${option.value ?? 'zero'}:${option.fuelId}`;
@@ -90,7 +87,7 @@ export function FipeVehiclePicker({
 
   useEffect(() => {
     const controller = new AbortController();
-    requestCatalog<FipeMakeOption[]>('/api/fipe/catalog?kind=makes', controller.signal)
+    listFipeMakes(controller.signal)
       .then(setMakes)
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === 'AbortError') return;
@@ -111,10 +108,7 @@ export function FipeVehiclePicker({
     async function loadModels() {
       setLoadingModels(true);
       try {
-        setModels(await requestCatalog<FipeModelOption[]>(
-          `/api/fipe/catalog?kind=models&makeId=${encodeURIComponent(makeId)}`,
-          controller.signal,
-        ));
+        setModels(await listFipeModels(makeId, controller.signal));
       } catch (reason) {
         if (reason instanceof DOMException && reason.name === 'AbortError') return;
         setError('Não foi possível carregar os modelos dessa marca.');
@@ -137,10 +131,7 @@ export function FipeVehiclePicker({
     async function loadYears() {
       setLoadingYears(true);
       try {
-        setYears(await requestCatalog<FipeYearOption[]>(
-          `/api/fipe/catalog?kind=years&modelId=${encodeURIComponent(modelId)}`,
-          controller.signal,
-        ));
+        setYears(await listFipeYearOptions(modelId, controller.signal));
       } catch (reason) {
         if (reason instanceof DOMException && reason.name === 'AbortError') return;
         setError('Não foi possível carregar os anos desse modelo.');
@@ -225,16 +216,11 @@ export function FipeVehiclePicker({
     setLoadingPrice(true);
 
     try {
-      const params = new URLSearchParams({
-        kind: 'price',
+      const vehicle = await getFipePrice({
         modelId,
         fuelId: choice.fuelId,
-        year: choice.isZeroKm ? 'zero' : String(choice.value),
-      });
-      const vehicle = await requestCatalog<FipeVehicleOption>(
-        `/api/fipe/catalog?${params.toString()}`,
-        controller.signal,
-      );
+        year: choice.isZeroKm ? null : choice.value,
+      }, controller.signal);
       setSelected(vehicle);
       onSelect(vehicle);
     } catch (reason) {
